@@ -135,7 +135,7 @@ func (s *Store) Save(r *http.Request, w http.ResponseWriter, session *sessions.S
 		return fmt.Errorf("Create: %v", err)
 	}
 
-	s.saveIDInCookie(w, session.Name(), id)
+	s.saveIDInCookie(w, session.Name(), id, session.Options)
 
 	return nil
 }
@@ -150,11 +150,17 @@ func (s *Store) readIDFromCookie(r *http.Request, name string) (string, error) {
 	return c.Value, nil
 }
 
-// saveIDInCookie saves the ID in a cookie.
-func (s *Store) saveIDInCookie(w http.ResponseWriter, name, id string) {
+// saveIDInCookie saves the ID and session options in a cookie.
+func (s *Store) saveIDInCookie(w http.ResponseWriter, name, id string, opts *sessions.Options) {
 	cookie := &http.Cookie{
-		Name:  name,
-		Value: id,
+		Name:     name,
+		Value:    id,
+		Path:     opts.Path,
+		Domain:   opts.Domain,
+		MaxAge:   opts.MaxAge,
+		Secure:   opts.Secure,
+		HttpOnly: opts.HttpOnly,
+		SameSite: opts.SameSite,
 	}
 	http.SetCookie(w, cookie)
 }
