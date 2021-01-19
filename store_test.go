@@ -57,9 +57,6 @@ func TestStore(t *testing.T) {
 		t.Errorf("Save: %v", err)
 	}
 
-	// Subsequent requests include the cookie.
-	r.Header.Set("Cookie", rr.Header().Get("Set-Cookie"))
-
 	got, err := s.Get(r, name)
 	if err != nil {
 		t.Errorf("Get: %v", err)
