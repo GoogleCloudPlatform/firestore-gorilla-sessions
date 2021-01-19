@@ -1,4 +1,4 @@
-module github.com/GoogleCloudPlatform/firestore-gorilla-sessions
+module github.com/loveholidays/firestore-gorilla-sessions
 
 go 1.11
 
