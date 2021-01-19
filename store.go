@@ -15,8 +15,7 @@
 // Package firestoregorilla is a Firestore-backed sessions store, which can be
 // used with gorilla/sessions.
 //
-// Encoded sessions are stored in Firestore and session IDs are stored in
-// secure cookies.
+// Encoded sessions are stored in Firestore
 //
 // Sessions never expire and are never deleted or cleaned up.
 package firestoregorilla
@@ -62,7 +61,7 @@ func New(ctx context.Context, client *firestore.Client) (*Store, error) {
 // Get returns a cached session, if it exists. Otherwise, Get returns a new
 // session.
 //
-// The name is used as the cookie name and Firestore collection name, so
+// The name is used as the Firestore collection name, so
 // different apps in the same Google Cloud project should use different names.
 func (s *Store) Get(r *http.Request, name string) (*sessions.Session, error) {
 	return sessions.GetRegistry(r).Get(s, name)
@@ -72,15 +71,15 @@ func (s *Store) Get(r *http.Request, name string) (*sessions.Session, error) {
 //
 // If the session already exists, it will be returned.
 //
-// The name is used as the cookie name and Firestore collection name, so
+// The name is used as the Firestore collection name, so
 // different apps in the same Google Cloud project should use different names.
 func (s *Store) New(r *http.Request, name string) (*sessions.Session, error) {
 	session := sessions.NewSession(s, name)
 
-	// Ignore errors in case the cookie isn't set yet.
-	id, _ := s.readIDFromCookie(r, name)
+	// Ignore errors in case the header is not present.
+	id, _ := s.readIDFromHeader(r, name)
 	if id == "" {
-		// No ID in the cookie means the session is new.
+		// No ID in the header means the session is new.
 		session.IsNew = true
 		return session, nil
 	}
@@ -107,18 +106,17 @@ func (s *Store) New(r *http.Request, name string) (*sessions.Session, error) {
 	}
 	session.ID = cachedSession.ID
 	session.Values = cachedSession.Values
-	session.Options = cachedSession.Options
 	session.IsNew = false
 
 	return session, nil
 }
 
-// Save persists the session to Firestore and the session ID in a cookie.
+// Save persists the session to Firestore.
 func (s *Store) Save(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
 	id := session.ID
 	if id == "" {
-		// Ignore errors in case the cookie isn't set yet.
-		id, _ = s.readIDFromCookie(r, session.Name())
+		// Ignore errors in case the session is not set yet
+		id, _ = s.readIDFromHeader(r, session.Name())
 	}
 	if id == "" {
 		id = s.client.Collection(session.Name()).NewDoc().ID
@@ -135,35 +133,22 @@ func (s *Store) Save(r *http.Request, w http.ResponseWriter, session *sessions.S
 		return fmt.Errorf("Create: %v", err)
 	}
 
-	s.saveIDInCookie(w, session.Name(), id)
-
 	return nil
 }
 
-// readIDFromCookie gets the ID stored int the cookie, if it exists.
-// It returns an error if the cookie is not set.
-func (s *Store) readIDFromCookie(r *http.Request, name string) (string, error) {
-	c, err := r.Cookie(name)
-	if err != nil {
-		return "", fmt.Errorf("Cookie: %v", err)
+// readIDFromHeader get the ID from a header
+func (s *Store) readIDFromHeader(r *http.Request, name string) (string, error) {
+	c := r.Header.Get(name)
+	if c == "" {
+		return "", fmt.Errorf("Header not present: %s", name)
 	}
-	return c.Value, nil
-}
-
-// saveIDInCookie saves the ID in a cookie.
-func (s *Store) saveIDInCookie(w http.ResponseWriter, name, id string) {
-	cookie := &http.Cookie{
-		Name:  name,
-		Value: id,
-	}
-	http.SetCookie(w, cookie)
+	return c, nil
 }
 
 // jsonSession is an encoding/json compatible version of sessions.Session.
 type jsonSession struct {
-	Values  map[string]interface{}
-	ID      string
-	Options *sessions.Options
+	Values map[string]interface{}
+	ID     string
 }
 
 // serialize serializes the session into a JSON string. Only string key values
@@ -179,9 +164,8 @@ func (s *Store) serialize(session *sessions.Session) (string, error) {
 		values[ks] = v
 	}
 	jSession := jsonSession{
-		Values:  values,
-		ID:      session.ID,
-		Options: session.Options,
+		Values: values,
+		ID:     session.ID,
 	}
 	b, err := json.Marshal(jSession)
 	if err != nil {
@@ -204,8 +188,7 @@ func (*Store) deserialize(s string) (*sessions.Session, error) {
 		values[k] = v
 	}
 	return &sessions.Session{
-		Values:  values,
-		ID:      jSession.ID,
-		Options: jSession.Options,
+		Values: values,
+		ID:     jSession.ID,
 	}, nil
 }
