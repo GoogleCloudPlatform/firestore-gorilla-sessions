@@ -47,6 +47,12 @@ var _ sessions.Store = &Store{}
 // document.
 type sessionDoc struct {
 	EncodedSession string
+	Expire         int
+}
+
+type sessionDocValue struct {
+	data   map[interface{}]interface{}
+	expire int
 }
 
 // New creates a new Store.
@@ -127,7 +133,19 @@ func (s *Store) Save(r *http.Request, w http.ResponseWriter, session *sessions.S
 	if err != nil {
 		return err
 	}
-	encoded := sessionDoc{EncodedSession: sessionString}
+
+	expire := 0
+	for _, value := range session.Values {
+		switch v := value.(type) {
+		case int:
+			expire = v
+		}
+	}
+
+	encoded := sessionDoc{
+		EncodedSession: sessionString,
+		Expire:         expire,
+	}
 
 	if _, err := s.client.Collection(session.Name()).Doc(id).Set(r.Context(), encoded); err != nil {
 		return fmt.Errorf("Create: %v", err)
